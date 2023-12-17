@@ -87,9 +87,7 @@ class Settings extends WriterPart
         $objWriter->writeAttribute('config:name', $worksheet->getTitle());
 
         $this->writeSelectedCells($objWriter, $worksheet);
-        if ($worksheet->getFreezePane() !== null) {
-            $this->writeFreezePane($objWriter, $worksheet);
-        }
+        $this->writeFreezePane($objWriter, $worksheet);
 
         $objWriter->endElement(); // config:config-item-map-entry Worksheet
     }
@@ -124,28 +122,49 @@ class Settings extends WriterPart
 
     private function writeFreezePane(XMLWriter $objWriter, Worksheet $worksheet): void
     {
-        $freezePane = CellAddress::fromCellAddress($worksheet->getFreezePane());
-        if ($freezePane->cellAddress() === 'A1') {
-            return;
-        }
+        $freezePane = CellAddress::fromCellAddress($worksheet->getFreezePane() ?: 'A1');
+        $xSplit = $worksheet->getXSplit();
+        $ySplit = $worksheet->getYSplit();
 
         $columnId = $freezePane->columnId();
         $columnName = $freezePane->columnName();
         $row = $freezePane->rowId();
+        $paneTopLeft = CellAddress::fromCellAddress($worksheet->getPaneTopLeftCell() ?: 'A1');
+        $topLeftCell = CellAddress::fromCellAddress($worksheet->getTopLeftCell() ?: 'A1');
+        $positionLeft = (string) ($topLeftCell->columnId() - 1);
+        $positionRight = (string) ($paneTopLeft->columnId() - 1);
+        $positionTop = (string) ($topLeftCell->rowId() - 1);
+        $positionBottom = (string) ($paneTopLeft->rowId() - 1);
+        if ($columnId > 1 || $xSplit === 0) {
+            $horizontalSlitMode = $columnId === 1 ? '0' : '2';
+            $horizontalSlitPosition = (string) ($columnId - 1);
+            $positionTop = '0';
+        } else {
+            $horizontalSlitMode = '1';
+            $horizontalSlitPosition = (string) $xSplit;
+        }
+        if ($row > 1 || $ySplit === 0) {
+            $verticalSplitMode = $row === 1 ? '0' : '2';
+            $verticalSplitPosition = (string) ($row - 1);
+            $positionLeft = '0';
+        } else {
+            $verticalSplitMode = '1';
+            $verticalSplitPosition = (string) $ySplit;
+        }
 
-        $this->writeSplitValue($objWriter, 'HorizontalSplitMode', 'short', '2');
-        $this->writeSplitValue($objWriter, 'HorizontalSplitPosition', 'int', (string) ($columnId - 1));
-        $this->writeSplitValue($objWriter, 'PositionLeft', 'short', '0');
-        $this->writeSplitValue($objWriter, 'PositionRight', 'short', (string) ($columnId - 1));
+        $this->writeSplitValue($objWriter, 'HorizontalSplitMode', 'short', $horizontalSlitMode);
+        $this->writeSplitValue($objWriter, 'HorizontalSplitPosition', 'int', $horizontalSlitPosition);
+        $this->writeSplitValue($objWriter, 'PositionLeft', 'short', $positionLeft);
+        $this->writeSplitValue($objWriter, 'PositionRight', 'short', $positionRight);
 
         for ($column = 'A'; $column !== $columnName; ++$column) {
             $worksheet->getColumnDimension($column)->setAutoSize(true);
         }
 
-        $this->writeSplitValue($objWriter, 'VerticalSplitMode', 'short', '2');
-        $this->writeSplitValue($objWriter, 'VerticalSplitPosition', 'int', (string) ($row - 1));
-        $this->writeSplitValue($objWriter, 'PositionTop', 'short', '0');
-        $this->writeSplitValue($objWriter, 'PositionBottom', 'short', (string) ($row - 1));
+        $this->writeSplitValue($objWriter, 'VerticalSplitMode', 'short', $verticalSplitMode);
+        $this->writeSplitValue($objWriter, 'VerticalSplitPosition', 'int', $verticalSplitPosition);
+        $this->writeSplitValue($objWriter, 'PositionTop', 'short', $positionTop);
+        $this->writeSplitValue($objWriter, 'PositionBottom', 'short', $positionBottom);
 
         $this->writeSplitValue($objWriter, 'ActiveSplitRange', 'short', '3');
     }

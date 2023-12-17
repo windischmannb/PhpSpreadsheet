@@ -29,6 +29,8 @@ use ZipArchive;
 class Ods extends BaseReader
 {
     const INITIAL_FILE = 'content.xml';
+    const PANE_SPLIT_MODE = '1';
+    const PANE_FROZEN_MODE = '2';
 
     /**
      * Create a new Ods Reader instance.
@@ -692,6 +694,8 @@ class Ods extends BaseReader
         foreach ($settings->getElementsByTagNameNS($configNs, 'config-item-map-named') as $t) {
             if ($t->getAttributeNs($configNs, 'name') === 'Tables') {
                 foreach ($t->getElementsByTagNameNS($configNs, 'config-item-map-entry') as $ws) {
+                    $verticalSplitPostion = $verticalSplitMode = $horizontalSplitMode = $horizontalSplitPosition = '0';
+                    $positionLeft = $positionRight = $positionTop = $positionBottom = '0';
                     $setRow = $setCol = '';
                     $wsname = $ws->getAttributeNs($configNs, 'name');
                     foreach ($ws->getElementsByTagNameNS($configNs, 'config-item') as $configItem) {
@@ -702,12 +706,92 @@ class Ods extends BaseReader
                         if ($attrName === 'CursorPositionY') {
                             $setRow = $configItem->nodeValue;
                         }
+                        if ($attrName === 'VerticalSplitPosition') {
+                            $verticalSplitPostion = (string) $configItem->nodeValue;
+                        }
+                        if ($attrName === 'VerticalSplitMode') {
+                            $verticalSplitMode = (string) $configItem->nodeValue;
+                        }
+                        if ($attrName === 'HorizontalSplitPosition') {
+                            $horizontalSplitPosition = (string) $configItem->nodeValue;
+                        }
+                        if ($attrName === 'HorizontalSplitMode') {
+                            $horizontalSplitMode = (string) $configItem->nodeValue;
+                        }
+                        if ($attrName === 'PositionRight') {
+                            $positionRight = (string) $configItem->nodeValue;
+                        }
+                        if ($attrName === 'PositionBottom') {
+                            $positionBottom = (string) $configItem->nodeValue;
+                        }
+                        if ($attrName === 'PositionTop') {
+                            $positionTop = (string) $configItem->nodeValue;
+                        }
+                        if ($attrName === 'PositionLeft') {
+                            $positionLeft = (string) $configItem->nodeValue;
+                        }
                     }
                     $this->setSelected($spreadsheet, $wsname, "$setCol", "$setRow");
+                    $this->setFreezeSplit($spreadsheet, $wsname, $verticalSplitMode, $verticalSplitPostion, $horizontalSplitMode, $horizontalSplitPosition);
+                    $this->setPositions($spreadsheet, $wsname, $positionLeft, $positionRight, $positionTop, $positionBottom);
                 }
 
                 break;
             }
+        }
+    }
+
+    private function setFreezeSplit(
+        Spreadsheet $spreadsheet,
+        string $wsname,
+        string $verticalSplitMode,
+        string $verticalSplitPostion,
+        string $horizontalSplitMode,
+        string $horizontalSplitPosition
+    ): void
+    {
+        $sheet = $spreadsheet->getSheetByName($wsname);
+        if ($sheet === null) {
+            return;
+        }
+        if ($verticalSplitMode === self::PANE_FROZEN_MODE || $horizontalSplitMode === self::PANE_FROZEN_MODE) {
+            $sheet->freezePane(
+                Coordinate::stringFromColumnIndex((int) $horizontalSplitPosition + 1)
+                . ((int) $verticalSplitPostion + 1)
+            );
+        }
+        if ($verticalSplitMode === self::PANE_SPLIT_MODE) {
+            $sheet->setYSplit((int) $verticalSplitPostion);
+        }
+        if ($horizontalSplitMode === self::PANE_SPLIT_MODE) {
+            $sheet->setXSplit((int) $horizontalSplitPosition);
+        }
+    }
+
+    private function setPositions(
+        Spreadsheet $spreadsheet,
+        string $wsname,
+        string $positionLeft,
+        string $positionRight,
+        string $positionTop,
+        string $positionBottom
+    )
+    {
+        $sheet = $spreadsheet->getSheetByName($wsname);
+        if ($sheet === null) {
+            return;
+        }
+        if ($positionRight !== '0' || $positionBottom !== '0') {
+            $sheet->setPaneTopLeftCell(
+                Coordinate::stringFromColumnIndex((int)$positionRight + 1)
+                . ((int)$positionBottom + 1)
+            );
+        }
+        if ($positionTop !== '0' || $positionLeft !== '0') {
+            $sheet->setTopLeftCell(
+                Coordinate::stringFromColumnIndex((int)$positionLeft + 1)
+                . ((int)$positionTop + 1)
+            );
         }
     }
 
